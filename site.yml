@@ -11,12 +11,12 @@
     grafana_image: "grafana/grafana:12.2.0"
   tasks:
     - name: Check that GRAFANA_ADMIN_PASSWORD is set
+      no_log: true
       ansible.builtin.assert:
         that:
           - grafana_admin_password is defined
           - grafana_admin_password | length > 0
         fail_msg: "Set GRAFANA_ADMIN_PASSWORD in the environment before running"
-        no_log: true
 
     - name: Create directories
       ansible.builtin.file:
@@ -47,11 +47,11 @@
         mode: "0644"
 
     - name: Create .env file
+      no_log: true
       ansible.builtin.copy:
         dest: "{{ monitoring_dir }}/.env"
         mode: "0600"
         content: "GRAFANA_ADMIN_PASSWORD={{ grafana_admin_password }}\n"
-        no_log: true
 
     - name: Deploy monitoring stack
       community.docker.docker_compose_v2:
