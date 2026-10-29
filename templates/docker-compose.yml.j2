@@ -1,0 +1,33 @@
+networks:
+  monitoring:
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+services:
+  prometheus:
+    image: "{{ prometheus_image }}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:{{ prometheus_port }}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring
+
+  grafana:
+    image: "{{ grafana_image }}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:{{ grafana_port }}:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
