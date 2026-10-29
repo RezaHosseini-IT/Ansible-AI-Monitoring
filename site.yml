@@ -1,0 +1,10 @@
+---
+- name: Deploy Prometheus and Grafana
+  hosts: monitoring
+  become: false
+  vars:
+    monitoring_dir: "{{ ansible_env.HOME }}/monitoring-stack"
+    prometheus_port: 9090
+    grafana_port: 3000
+    grafana_admin_password: "{{ lookup('ansible.builtin.env', 'GRAFANA_ADMIN_PASSWORD') }}"
+  tasks: []
