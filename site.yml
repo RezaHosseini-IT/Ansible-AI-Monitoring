@@ -9,4 +9,51 @@
     grafana_admin_password: "{{ lookup('ansible.builtin.env', 'GRAFANA_ADMIN_PASSWORD') }}"
     prometheus_image: "prom/prometheus:v3.5.0"
     grafana_image: "grafana/grafana:12.2.0"
-  tasks: []
+  tasks:
+    - name: Check that GRAFANA_ADMIN_PASSWORD is set
+      ansible.builtin.assert:
+        that:
+          - grafana_admin_password is defined
+          - grafana_admin_password | length > 0
+        fail_msg: "Set GRAFANA_ADMIN_PASSWORD in the environment before running"
+        no_log: true
+
+    - name: Create directories
+      ansible.builtin.file:
+        state: directory
+        mode: "0755"
+        path: "{{ item }}"
+      loop:
+        - "{{ monitoring_dir }}"
+        - "{{ monitoring_dir }}/prometheus"
+        - "{{ monitoring_dir }}/grafana/provisioning/datasources"
+
+    - name: Deploy Prometheus configuration
+      ansible.builtin.template:
+        src: templates/prometheus.yml.j2
+        dest: "{{ monitoring_dir }}/prometheus/prometheus.yml"
+        mode: "0644"
+
+    - name: Deploy docker-compose.yml
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ monitoring_dir }}/docker-compose.yml"
+        mode: "0644"
+
+    - name: Deploy Grafana datasource configuration
+      ansible.builtin.copy:
+        src: files/grafana/provisioning/datasources/prometheus.yml
+        dest: "{{ monitoring_dir }}/grafana/provisioning/datasources/prometheus.yml"
+        mode: "0644"
+
+    - name: Create .env file
+      ansible.builtin.copy:
+        dest: "{{ monitoring_dir }}/.env"
+        mode: "0600"
+        content: "GRAFANA_ADMIN_PASSWORD={{ grafana_admin_password }}\n"
+        no_log: true
+
+    - name: Deploy monitoring stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_dir }}"
+        state: present
