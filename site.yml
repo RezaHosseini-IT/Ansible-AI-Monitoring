@@ -29,6 +29,10 @@
         - "{{ monitoring_dir }}"
         - "{{ monitoring_dir }}/prometheus"
         - "{{ monitoring_dir }}/grafana/provisioning/datasources"
+        - "{{ monitoring_dir }}/bin"
+        - "{{ monitoring_dir }}/textfile"
+        - "{{ monitoring_dir }}/grafana/dashboards"
+        - "{{ monitoring_dir }}/grafana/provisioning/dashboards"
 
     - name: Deploy Prometheus configuration
       ansible.builtin.template:
@@ -48,6 +52,45 @@
         src: files/grafana/provisioning/datasources/prometheus.yml
         dest: "{{ monitoring_dir }}/grafana/provisioning/datasources/prometheus.yml"
         mode: "0644"
+      register: grafana_datasource_config
+
+    - name: Deploy Grafana dashboard provider
+      ansible.builtin.copy:
+        src: files/grafana/provisioning/dashboards/dashboards.yml
+        dest: "{{ monitoring_dir }}/grafana/provisioning/dashboards/dashboards.yml"
+        mode: "0644"
+      register: grafana_dashboard_provider
+
+    - name: Generate Grafana dashboard
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/tools/make_dashboard.py"
+          - "--out"
+          - "{{ monitoring_dir }}/grafana/dashboards/homelab-overview.json"
+      register: dashboard_result
+      changed_when: dashboard_result.stdout | trim == 'changed'
+
+    - name: Deploy Ollama and GPU exporter script
+      ansible.builtin.copy:
+        src: files/ollama_gpu_exporter.py
+        dest: "{{ monitoring_dir }}/bin/ollama_gpu_exporter.py"
+        mode: "0755"
+
+    - name: Write initial Ollama and GPU metrics
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ monitoring_dir }}/bin/ollama_gpu_exporter.py"
+          - "--out"
+          - "{{ monitoring_dir }}/textfile/ollama_gpu.prom"
+      changed_when: false
+
+    - name: Schedule Ollama and GPU metrics export
+      ansible.builtin.cron:
+        name: "monitoring ollama gpu exporter"
+        minute: "*"
+        job: "/usr/bin/python3 {{ monitoring_dir }}/bin/ollama_gpu_exporter.py --out {{ monitoring_dir }}/textfile/ollama_gpu.prom --loops 4 --interval 15 >/dev/null 2>&1"
 
     - name: Create .env file
       no_log: true
@@ -74,6 +117,14 @@
           - prometheus
         state: restarted
       when: prometheus_config is changed
+
+    - name: Restart Grafana if the dashboard provider changed
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_dir }}"
+        services:
+          - grafana
+        state: restarted
+      when: grafana_dashboard_provider is changed
 
     - name: Wait for Prometheus to be ready
       ansible.builtin.uri:
@@ -117,3 +168,22 @@
         that:
           - "'Prometheus' in (grafana_datasources.json | map(attribute='name') | list)"
         success_msg: "Prometheus datasource is provisioned in Grafana"
+
+    - name: Wait for the dashboard to be provisioned
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/api/search?query=Homelab"
+        url_username: admin
+        url_password: "{{ grafana_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: grafana_dashboards
+      retries: 12
+      delay: 5
+      until: grafana_dashboards.json | length > 0
+      no_log: true
+
+    - name: Assert the Homelab Overview dashboard exists
+      ansible.builtin.assert:
+        that:
+          - "grafana_dashboards.json | selectattr('uid', 'equalto', 'homelab-overview') | list | length == 1"
+        success_msg: "Homelab Overview dashboard is provisioned"
