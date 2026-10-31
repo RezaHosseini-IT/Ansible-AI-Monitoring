@@ -138,7 +138,7 @@ ROWS = [
                 "title": "GPU power",
                 "type": "timeseries",
                 "unit": "watt",
-                "targets": [("node_hwmon_power_average_watt * on(chip) group_left(card) gpu_card_info", "{{card}}")]
+                "targets": [("node_hwmon_power_watt * on(chip) group_left(card) gpu_card_info", "{{card}}")]
             },
             {
                 "title": "GPU fan",
@@ -166,6 +166,161 @@ ROWS = [
                 "title": "PCIe link speed (GT/s)",
                 "type": "stat",
                 "targets": [("gpu_pcie_link_speed_gts", "{{card}}")]
+            }
+        ]
+    ),
+    
+    # Ollama row
+    (
+        "Ollama", 5, [
+            {
+                "title": "Ollama API up",
+                "type": "stat",
+                "targets": [("ollama_up", "up")]
+            },
+            {
+                "title": "Models loaded",
+                "type": "stat",
+                "targets": [("ollama_models_loaded", "")]
+            },
+            {
+                "title": "GPU offload %",
+                "type": "gauge",
+                "unit": "percent",
+                "min": 0,
+                "max": 100,
+                "targets": [("ollama_model_size_vram_bytes / ollama_model_size_bytes * 100", "{{model}}")]
+            },
+            {
+                "title": "Context length",
+                "type": "stat",
+                "targets": [("ollama_model_context_length", "{{model}}")]
+            },
+            {
+                "title": "Unloads in",
+                "type": "stat",
+                "unit": "s",
+                "targets": [("ollama_model_expires_timestamp_seconds - time()", "{{model}}")]
+            }
+        ]
+    ),
+    
+    # Ollama resources row
+    (
+        "Ollama resources", 8, [
+            {
+                "title": "Model size",
+                "type": "timeseries",
+                "unit": "bytes",
+                "targets": [
+                    ("ollama_model_size_bytes", "{{model}} total"),
+                    ("ollama_model_size_vram_bytes", "{{model}} in VRAM")
+                ]
+            },
+            {
+                "title": "Ollama service CPU",
+                "type": "timeseries",
+                "unit": "percent",
+                "targets": [("sum(rate(container_cpu_usage_seconds_total{id=\"/system.slice/ollama.service\"}[1m])) * 100", "ollama")]
+            },
+            {
+                "title": "Ollama service memory",
+                "type": "timeseries",
+                "unit": "bytes",
+                "targets": [("container_memory_working_set_bytes{id=\"/system.slice/ollama.service\"}", "ollama")]
+            }
+        ]
+    ),
+    
+    # Docker containers row
+    (
+        "Docker containers", 5, [
+            {
+                "title": "Running containers",
+                "type": "stat",
+                "targets": [("count(container_memory_working_set_bytes{name!=\"\"})", "")]
+            },
+            {
+                "title": "Containers CPU total",
+                "type": "stat",
+                "unit": "percent",
+                "targets": [("sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[1m])) * 100", "")]
+            },
+            {
+                "title": "Containers memory total",
+                "type": "stat",
+                "unit": "bytes",
+                "targets": [("sum(container_memory_working_set_bytes{name!=\"\"})", "")]
+            }
+        ]
+    ),
+    
+    # Docker CPU and memory row
+    (
+        "Docker CPU and memory", 8, [
+            {
+                "title": "CPU per container",
+                "type": "timeseries",
+                "unit": "percent",
+                "targets": [("sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[1m])) * 100", "{{name}}")]
+            },
+            {
+                "title": "Memory per container",
+                "type": "timeseries",
+                "unit": "bytes",
+                "targets": [("sum by (name) (container_memory_working_set_bytes{name!=\"\"})", "{{name}}")]
+            }
+        ]
+    ),
+    
+    # Docker network and disk row
+    (
+        "Docker network and disk", 8, [
+            {
+                "title": "Network per container",
+                "type": "timeseries",
+                "unit": "Bps",
+                "targets": [
+                    ("sum by (name) (rate(container_network_receive_bytes_total{name!=\"\"}[1m]))", "{{name}} rx"),
+                    ("sum by (name) (rate(container_network_transmit_bytes_total{name!=\"\"}[1m]))", "{{name}} tx")
+                ]
+            },
+            {
+                "title": "Disk I/O per container",
+                "type": "timeseries",
+                "unit": "Bps",
+                "targets": [
+                    ("sum by (name) (rate(container_fs_reads_bytes_total{name!=\"\"}[1m]))", "{{name}} read"),
+                    ("sum by (name) (rate(container_fs_writes_bytes_total{name!=\"\"}[1m]))", "{{name}} write")
+                ]
+            },
+            {
+                "title": "Container uptime",
+                "type": "bargauge",
+                "unit": "s",
+                "targets": [("time() - container_start_time_seconds{name!=\"\"}", "{{name}}")]
+            }
+        ]
+    ),
+    
+    # Prometheus row
+    (
+        "Prometheus", 5, [
+            {
+                "title": "Scrape targets",
+                "type": "stat",
+                "targets": [("up", "{{job}}")]
+            },
+            {
+                "title": "Time series in head",
+                "type": "stat",
+                "targets": [("prometheus_tsdb_head_series", "")]
+            },
+            {
+                "title": "Prometheus memory",
+                "type": "stat",
+                "unit": "bytes",
+                "targets": [("process_resident_memory_bytes{job=\"prometheus\"}", "")]
             }
         ]
     )
