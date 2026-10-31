@@ -61,6 +61,12 @@
         project_src: "{{ monitoring_dir }}"
         state: present
 
+    - name: Create textfile directory for Ollama/GPU metrics
+      ansible.builtin.file:
+        state: directory
+        mode: "0755"
+        path: "{{ monitoring_dir }}/textfile"
+
     - name: Restart Prometheus if its config changed
       community.docker.docker_compose_v2:
         project_src: "{{ monitoring_dir }}"

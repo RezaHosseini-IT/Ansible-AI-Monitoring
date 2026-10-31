@@ -50,6 +50,22 @@ services:
       - /:/rootfs:ro
       - ./textfile:/textfile:ro
 
+  ollama-gpu-exporter:
+    image: "python:3.11-alpine"
+    restart: unless-stopped
+    networks:
+      - monitoring
+    command:
+      - "python"
+      - "/app/ollama_gpu_exporter.py"
+      - "--out"
+      - "/textfile/ollama_gpu.prom"
+      - "--interval"
+      - "30"
+    volumes:
+      - ./textfile:/textfile:rw
+      - ./ollama_gpu_exporter.py:/app/ollama_gpu_exporter.py:ro
+
   cadvisor:
     image: "{{ cadvisor_image }}"
     restart: unless-stopped
