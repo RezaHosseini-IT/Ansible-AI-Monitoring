@@ -9,6 +9,7 @@
     grafana_admin_password: "{{ lookup('ansible.builtin.env', 'GRAFANA_ADMIN_PASSWORD') }}"
     prometheus_image: "prom/prometheus:v3.5.0"
     grafana_image: "grafana/grafana:12.2.0"
+    node_exporter_image: "prom/node-exporter:v1.9.1"
   tasks:
     - name: Check that GRAFANA_ADMIN_PASSWORD is set
       no_log: true
