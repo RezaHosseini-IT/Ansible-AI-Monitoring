@@ -96,7 +96,12 @@ def get_gpu_metrics():
                     real_path = os.path.realpath(device_path)
                     if real_path.startswith('/sys/devices/'):
                         chip = real_path[len('/sys/devices/'):]
-                        chip = chip.replace('/', '_').replace('.', '_')
+                        # Keep only last two path components and replace dots with underscores
+                        parts = chip.split('/')
+                        if len(parts) >= 2:
+                            chip = '_'.join(parts[-2:]).replace('.', '_')
+                        else:
+                            chip = chip.replace('/', '_').replace('.', '_')
                         metrics['gpu_card_info'][card] = chip
             except Exception:
                 pass
