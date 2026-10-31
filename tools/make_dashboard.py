@@ -437,37 +437,55 @@ def create_dashboard(out_path):
     
     # Add row panels and their content panels
     panel_id = 1
-    for row_title, height, panels in ROWS:
+    y = 0
+    
+    for row_title, panel_height, panels in ROWS:
         # Add row panel
         row_panel = {
             "id": panel_id,
             "title": row_title,
             "type": "row",
             "collapsed": False,
-            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": y}
         }
         dashboard["panels"].append(row_panel)
         panel_id += 1
+        y += 1
         
-        # Calculate panel width
-        if panels:
-            panel_width = 24 // len(panels)
-        else:
-            panel_width = 24
+        # Calculate panel width and layout
+        n = len(panels)
+        if n > 0:
+            w = 24 // n
+            x = 0
             
-        # Add content panels
-        for i, panel_def in enumerate(panels):
-            # Create the panel
-            panel = create_panel(panel_def, panel_id, chr(ord('A') + i))
-            
-            # Set grid position
-            panel["gridPos"]["h"] = height
-            panel["gridPos"]["w"] = panel_width
-            panel["gridPos"]["x"] = i * panel_width
-            panel["gridPos"]["y"] = 0
-            
-            dashboard["panels"].append(panel)
-            panel_id += 1
+            for i, panel_def in enumerate(panels):
+                # Create the panel
+                panel = create_panel(panel_def, panel_id, chr(ord('A') + i))
+                
+                # Calculate width for this panel
+                if i == n - 1:
+                    # Last panel gets remaining width to fill the row
+                    width = 24 - w * (n - 1)
+                else:
+                    width = w
+                
+                # Handle line wrapping
+                if x + width > 24:
+                    x = 0
+                    y += panel_height
+                
+                # Set grid position
+                panel["gridPos"]["h"] = panel_height
+                panel["gridPos"]["w"] = width
+                panel["gridPos"]["x"] = x
+                panel["gridPos"]["y"] = y
+                
+                dashboard["panels"].append(panel)
+                panel_id += 1
+                x += width
+        
+        # Move to next line after the row
+        y += panel_height
     
     # Serialize to JSON
     json_content = json.dumps(dashboard, indent=2, sort_keys=True) + '\n'
