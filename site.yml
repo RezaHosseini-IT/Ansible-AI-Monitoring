@@ -34,6 +34,7 @@
         src: templates/prometheus.yml.j2
         dest: "{{ monitoring_dir }}/prometheus/prometheus.yml"
         mode: "0644"
+      register: prometheus_config
 
     - name: Deploy docker-compose.yml
       ansible.builtin.template:
@@ -58,3 +59,54 @@
       community.docker.docker_compose_v2:
         project_src: "{{ monitoring_dir }}"
         state: present
+
+    - name: Restart Prometheus if its config changed
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_dir }}"
+        services:
+          - prometheus
+        state: restarted
+      when: prometheus_config is changed
+
+    - name: Wait for Prometheus to be ready
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/-/ready"
+        status_code: 200
+      register: prometheus_ready
+      retries: 12
+      delay: 5
+      until: prometheus_ready.status == 200
+
+    - name: Wait for Grafana to be healthy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/api/health"
+        status_code: 200
+      register: grafana_health
+      retries: 12
+      delay: 5
+      until: grafana_health.status == 200
+
+    - name: Wait for all Prometheus targets to be up
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/api/v1/targets"
+        return_content: true
+      register: prometheus_targets
+      retries: 12
+      delay: 5
+      until: prometheus_targets.json.data.activeTargets | map(attribute='health') | unique | list == ['up']
+
+    - name: Query Grafana datasources
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/api/datasources"
+        url_username: admin
+        url_password: "{{ grafana_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: grafana_datasources
+      no_log: true
+
+    - name: Assert Prometheus datasource is provisioned
+      ansible.builtin.assert:
+        that:
+          - "'Prometheus' in (grafana_datasources.json | map(attribute='name') | list)"
+        success_msg: "Prometheus datasource is provisioned in Grafana"
