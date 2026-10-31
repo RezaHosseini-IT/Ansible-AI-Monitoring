@@ -24,6 +24,7 @@ services:
       - "127.0.0.1:{{ grafana_port }}:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     networks:
       - monitoring
@@ -41,7 +42,24 @@ services:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--path.rootfs=/rootfs"
+      - "--collector.drm"
+      - "--collector.textfile.directory=/textfile"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+      - ./textfile:/textfile:ro
+
+  cadvisor:
+    image: "{{ cadvisor_image }}"
+    restart: unless-stopped
+    networks:
+      - monitoring
+    command:
+      - "--housekeeping_interval=15s"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
